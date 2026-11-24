@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Comptes : role = modèle par défaut, perms = autorisations réellement accordées
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String   @default("consultant") // admin | owner | tech | consultant
+  perms        String[]
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  sites        Site[]   // sites auxquels l'utilisateur a accès
+}
+
+// Site = lieu géographique (carte). lat/lng placés à la main ou en cliquant sur la carte
+model Site {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  lat       Float?
+  lng       Float?
+  createdAt DateTime @default(now())
+  users     User[]
+  devices   Device[]
+}
+
+// Identification hardware : un Raspberry = un Device (token Bearer pour /api/ingest)
+model Device {
+  id        String    @id @default(cuid())
+  serial    String    @unique
+  name      String
+  model     String?
+  mac       String?
+  firmware  String?
+  location  String?
+  siteId    String?
+  site      Site?     @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  token     String    @unique @default(cuid())
+  lastSeen  DateTime?
+  createdAt DateTime  @default(now())
+  readings  Reading[]
+}
+
+model Metric {
+  id    String  @id @default(cuid())
+  path  String  @unique
+  label String
+  unit  String?
+  min   Float?
+  max   Float?
+  auto  Boolean @default(false)
+}
+
+model Reading {
+  id       String   @id @default(cuid())
+  deviceId String
+  ts       DateTime
+  payload  Json
+  device   Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  @@index([deviceId, ts])
+}
+
+model Widget {
+  id        String   @id @default(cuid())
+  title     String
+  type      String
+  metrics   Json
+  deviceId  String?
+  range     String   @default("24h")
+  norm      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
